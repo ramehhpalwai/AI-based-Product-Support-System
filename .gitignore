@@ -208,7 +208,7 @@ __marimo__/
 
 
 data/README.md 
-data/
+data/raw/
 .vscode/
 .venv
 echo data/raw/
