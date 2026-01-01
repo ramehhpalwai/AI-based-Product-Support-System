@@ -211,4 +211,3 @@ data/README.md
 data/raw/
 .vscode/
 .venv
-echo data/raw/
