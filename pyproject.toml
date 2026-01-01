@@ -1,0 +1,6 @@
+[project]
+name = "ai_support_system"
+version = "0.1.0"
+
+[tool.setuptools.packages.find]
+where = ["."]
