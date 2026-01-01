@@ -211,3 +211,4 @@ data/README.md
 data/
 .vscode/
 .venv
+echo "data/raw/"
