@@ -211,3 +211,4 @@ data/README.md
 data/raw/
 .vscode/
 .venv
+notebooks/graph_rag.html
