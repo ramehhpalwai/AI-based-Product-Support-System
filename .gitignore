@@ -212,3 +212,5 @@ data/raw/
 .vscode/
 .venv
 notebooks/graph_rag.html
+milvus_data
+minio_data
