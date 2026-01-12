@@ -76,6 +76,8 @@ def solutions_from_error_codes(
     top_k: int = 10,
 ) -> List[Tuple[str, float]]:
     """
+    Given these error codes, what solutions fixed tickets with the same error?.
+    Navigation is: error_code - > ticket ->solution
     Returns: [(solution_node, score), ...]
     score here is just frequency count across linked tickets (simple + effective).
     """
@@ -117,6 +119,7 @@ def tickets_for_issue(
     subcategory: str,
     top_k: int = 50,
 ) -> List[str]:
+    """It returns historical tickets connected to the issue:"""
     issue_node = get_issue_node(category, subcategory)
     if not graph.has_node(issue_node):
         return []
@@ -137,6 +140,42 @@ class GraphCandidates:
     solution_priors: Dict[str, float]      # solution_node -> prior score
 
 
+# def graph_rag_candidates(
+#     graph: nx.Graph,
+#     query: GraphQuery,
+#     top_solutions: int = 10,
+#     top_error_solutions: int = 10,
+#     top_tickets: int = 50,
+# ) -> GraphCandidates:
+
+#     solution_priors: Dict[str, float] = {}
+
+#     # 1) issue-level solutions (strong prior)
+#     if query.category and query.subcategory:
+#         issue_solutions = top_solutions_for_issue(graph, query.category, query.subcategory, top_k=top_solutions)
+#         for solution_node, helpful_rate, count in issue_solutions:
+#             prior = 0.7 * helpful_rate + 0.3 * (np.log1p(count) / 5.0)
+#             solution_priors[solution_node] = max(solution_priors.get(solution_node, 0.0), float(prior))
+
+#     # 2) error-code solutions (precision boost)
+#     for solution_node, score in solutions_from_error_codes(graph, query.text, top_k=top_error_solutions):
+#         solution_priors[solution_node] = max(solution_priors.get(solution_node, 0.0), float(0.2 + 0.05 * score))
+
+#     # 3) tickets for citations
+#     ticket_nodes: List[str] = []
+#     if query.category and query.subcategory:
+#         ticket_nodes = tickets_for_issue(graph, query.category, query.subcategory, top_k=top_tickets)
+
+#     # final ordering
+#     solution_nodes = sorted(solution_priors.keys(), key=lambda s: solution_priors[s], reverse=True)
+
+#     return GraphCandidates(solution_nodes=solution_nodes, ticket_nodes=ticket_nodes, solution_priors=solution_priors)
+
+
+import numpy as np
+from typing import Dict, List
+import networkx as nx
+
 def graph_rag_candidates(
     graph: nx.Graph,
     query: GraphQuery,
@@ -147,16 +186,25 @@ def graph_rag_candidates(
 
     solution_priors: Dict[str, float] = {}
 
-    # 1) issue-level solutions (strong prior)
+    # 1) issue-level solutions (0..~1 scale)
     if query.category and query.subcategory:
         issue_solutions = top_solutions_for_issue(graph, query.category, query.subcategory, top_k=top_solutions)
         for solution_node, helpful_rate, count in issue_solutions:
-            prior = 0.7 * helpful_rate + 0.3 * (np.log1p(count) / 5.0)
-            solution_priors[solution_node] = max(solution_priors.get(solution_node, 0.0), float(prior))
+            issue_prior = 0.7 * helpful_rate + 0.3 * (np.log1p(count) / 5.0)
+            solution_priors[solution_node] = float(issue_prior)
 
-    # 2) error-code solutions (precision boost)
+    # 2) error-code solutions (log-scaled boost, capped)
+    # score here is frequency (can be large) -> compress to ~0..0.4
     for solution_node, score in solutions_from_error_codes(graph, query.text, top_k=top_error_solutions):
-        solution_priors[solution_node] = max(solution_priors.get(solution_node, 0.0), float(0.2 + 0.05 * score))
+        error_boost = 0.10 * np.log1p(score)          # grows slowly
+        error_boost = float(min(error_boost, 0.40))   # cap so it can't dominate
+
+        # combine: prior + boost (keeps issue prior as base, error refines)
+        solution_priors[solution_node] = float(solution_priors.get(solution_node, 0.0) + error_boost)
+
+    # Optional: cap final priors to 1.0 for stability
+    for k in list(solution_priors.keys()):
+        solution_priors[k] = float(min(solution_priors[k], 1.0))
 
     # 3) tickets for citations
     ticket_nodes: List[str] = []
