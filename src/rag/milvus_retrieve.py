@@ -53,7 +53,7 @@ def milvus_hybrid_retrieve(
     )[0].tolist()
 
     # If you built HNSW index, use ef; if IVF, use nprobe.
-    # Default here assumes HNSW (as we changed earlier).
+    # Default here assumes HNSW 
     if dense_search_params is None:
         dense_search_params = {"metric_type": "IP", "params": {"ef": 64}}
 

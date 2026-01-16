@@ -6,7 +6,9 @@ import re
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 import networkx as nx
-
+import pickle
+import networkx as nx
+from typing import Iterable, Any
 
 # Example matches: ERROR_DISK_FULL, ERROR_SERVER_500, ERROR_RATELIMIT_429
 ERROR_CODE_PATTERN = re.compile(r"\bERROR_[A-Z0-9_]+\b")
@@ -155,6 +157,23 @@ def build_support_graph(tickets: Iterable[Any]) -> nx.Graph:
     return graph
 
 
+
+def build_and_save_graph(tickets: Iterable[Any], path: str) -> nx.Graph:
+    g = build_support_graph(tickets)
+    with open(path, "wb") as f:
+        pickle.dump(g, f)
+    return g
+
+def load_graph(path: str) -> nx.Graph:
+    with open(path, "rb") as f:
+        return pickle.load(f)
+
+if __name__ =="__main__":
+    from src.data.ingestion import load_tickets
+    json_data = load_tickets("data/raw/support_tickets.json")
+    Data_tickets = json_data[0]
+    path = "data/artifacts/support_graph.pkl"
+    build_and_save_graph(Data_tickets,path)
 
 # # ---- Example usage ----
 # support_graph = build_support_graph(tickets)
