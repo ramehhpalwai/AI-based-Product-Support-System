@@ -8,63 +8,84 @@ from sklearn.compose import ColumnTransformer
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.preprocessing import OneHotEncoder
 
-def prepare_classification_dataset(records: List[Any]) -> pd.DataFrame:
-    data = []
-    for r in records:
-        if hasattr(r, "model_dump"):     # Pydantic
-            r = r.model_dump()
-        elif not isinstance(r, dict):
-            r = dict(r)
+from src.classification.data_processing import (prepare_classification_dataset,
+                                                group_text_and_train_val_test_split,
+                                                build_feature_encoder_pipeline_tfidf)
 
-        text = f"{r.get('subject','')}\n{r.get('description','')}\n{r.get('error_logs','')}"
+from __future__ import annotations
 
-        data.append({
-            "text": text,
-            "product": r.get("product", ""),
-            "product_module": r.get("product_module", ""),
-            "priority": r.get("priority", ""),
-            "channel": r.get("channel", ""),
-            "customer_tier": r.get("customer_tier", ""),
-            "region": r.get("region", ""),
-            "category": r.get("category", ""),
-        })
-
-    return pd.DataFrame(data)
+import pandas as pd
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import f1_score, classification_report
 
 
+class TrainLogisticRegression:
+    def __init__(self, tickets_data):
+        self.tickets_data = tickets_data
 
-# IMPORTANT: pass the list of records (not json_data[0] unless nested)
-classification_data = prepare_classification_dataset(json_data[0])
+        # Will be set after training
+        self.preprocessor = None
+        self.model = None
 
-X = classification_data.drop("category", axis=1)
-y = classification_data["category"]
+    def train(self):
+        # 1) Prepare dataset
+        classification_data = prepare_classification_dataset(self.tickets_data)
+        classification_data = pd.DataFrame(classification_data)
 
-X_train, X_tmp, y_train, y_tmp = train_test_split(
-    X, y, test_size=0.30, random_state=42, stratify=y
-)
-X_val, X_test, y_val, y_test = train_test_split(
-    X_tmp, y_tmp, test_size=0.50, random_state=42, stratify=y_tmp
-)
+        train_df, val_df, test_df = group_text_and_train_val_test_split(classification_data)
 
-preprocess = ColumnTransformer(
-    transformers=[
-        ("text", TfidfVectorizer(max_features=80_000, ngram_range=(1, 2), min_df=2), "text"),
-        ("cat", OneHotEncoder(handle_unknown="ignore"),
-         ["product","product_module","priority","channel","customer_tier","region"]),
-    ],
-)
+        label_cols = ["subcategory", "category"]
 
-X_train_t = preprocess.fit_transform(X_train)
-X_val_t = preprocess.transform(X_val)
-X_test_t = preprocess.transform(X_test)
+        # 2) Split X/y
+        X_train = train_df.drop(columns=label_cols, errors="ignore")
+        X_val   = val_df.drop(columns=label_cols, errors="ignore")
+        X_test  = test_df.drop(columns=label_cols, errors="ignore")
 
-model = LogisticRegression(max_iter=2000, class_weight="balanced")
-model.fit(X_train_t, y_train)
+        # If you're training only category (as you do below):
+        y_train = train_df["category"]
+        y_val   = val_df["category"]
+        y_test  = test_df["category"]
 
-val_pred = model.predict(X_val_t)
-print("VAL weighted F1:", round(f1_score(y_val, val_pred, average="weighted"), 4))
-print(classification_report(y_val, val_pred, digits=3))
+        cat_cols = ["product", "product_module", "priority", "channel", "customer_tier"]
+        text_col = "text"
 
-test_pred = model.predict(X_test_t)
-print("TEST weighted F1:", round(f1_score(y_test, test_pred, average="weighted"), 4))
-print(classification_report(y_test, test_pred, digits=3))
+        # 3) Fit/transform features
+        self.preprocessor = build_feature_encoder_pipeline_tfidf(
+            cat_cols=cat_cols,
+            text_col=text_col
+        )
+
+        X_train_t = self.preprocessor.fit_transform(X_train)
+        X_val_t   = self.preprocessor.transform(X_val)
+        X_test_t  = self.preprocessor.transform(X_test)
+
+        # 4) Train model
+        self.model = LogisticRegression(
+            max_iter=2000,
+            class_weight="balanced",
+            n_jobs=None
+        )
+        self.model.fit(X_train_t, y_train)
+
+        # 5) Evaluate
+        val_pred = self.model.predict(X_val_t)
+        val_f1 = f1_score(y_val, val_pred, average="weighted")
+        print("\n--- VALIDATION ---")
+        print("Weighted F1:", round(val_f1, 4))
+        print(classification_report(y_val, val_pred, digits=3))
+
+        test_pred = self.model.predict(X_test_t)
+        test_f1 = f1_score(y_test, test_pred, average="weighted")
+        print("\n--- TEST ---")
+        print("Weighted F1:", round(test_f1, 4))
+        print(classification_report(y_test, test_pred, digits=3))
+
+        return self  # allows chaining
+
+    def predict(self, df: pd.DataFrame):
+        if self.preprocessor is None or self.model is None:
+            raise RuntimeError("Model not trained. Call .train() first.")
+
+        X_t = self.preprocessor.transform(df)
+        return self.model.predict(X_t)
+
