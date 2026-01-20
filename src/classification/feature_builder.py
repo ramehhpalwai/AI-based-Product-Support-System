@@ -6,7 +6,7 @@ import pandas as pd
 from scipy.sparse import csr_matrix, hstack
 from sklearn.preprocessing import LabelEncoder, OneHotEncoder
 from sentence_transformers import SentenceTransformer
-
+from scipy.sparse import csr_matrix, hstack
 from src.classification.data_processing import (prepare_classification_dataset,
                                                 group_text_and_train_val_test_split,
                                                 )
@@ -196,6 +196,9 @@ class BuildClassificationFeatures:
     def _build_labels(self, df: pd.DataFrame) -> pd.Series:
         if self.label_mode == "category":
             return df["category"].astype(str).fillna("")
+        
+        if self.label_mode == "subcategory":
+            return df["subcategory"].astype(str).fillna("")
 
         if self.label_mode == "category|subcategory":
             cat = df["category"].astype(str).fillna("")
@@ -203,3 +206,46 @@ class BuildClassificationFeatures:
             return pd.Series(np.where(sub != "", cat + "|" + sub, cat), index=df.index)
 
         raise ValueError("label_mode must be 'category' or 'category|subcategory'")
+
+
+    def transform_new(self, tickets_data: Any) -> csr_matrix:
+        """
+        Transform new/unseen tickets into model-ready X using
+        already-fitted embedder + ohe (no re-fitting).
+        """
+        if self.embedder is None:
+            raise ValueError("Embedder is not fitted. Call build() first.")
+        if self.ohe is None:
+            raise ValueError("OHE is not fitted. Call build() first.")
+
+        df = pd.DataFrame(prepare_classification_dataset(tickets_data))
+
+        # ensure missing categorical columns exist
+        for c in self.cat_cols:
+            if c not in df.columns:
+                df[c] = ""
+
+        # ensure missing text column exists
+        if self.text_col not in df.columns:
+            df[self.text_col] = ""
+
+        texts = [t if isinstance(t, str) else "" for t in df[self.text_col].tolist()]
+
+        # text features
+        if self.text_mode == "tfidf":
+            X_text = self.embedder.transform(texts).tocsr()
+        else:
+            X_text_dense = self.embedder.encode(
+                texts,
+                batch_size=self.batch_size,
+                show_progress_bar=False,
+                convert_to_numpy=True,
+                normalize_embeddings=self.normalize_embeddings,
+            )
+            X_text = csr_matrix(X_text_dense)
+
+        # categorical features
+        X_cat = self.ohe.transform(df[self.cat_cols])
+
+        # combine
+        return hstack([X_text, X_cat], format="csr")
