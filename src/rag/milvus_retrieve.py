@@ -2,7 +2,28 @@ import time
 from typing import List, Optional, Dict, Any
 
 from pymilvus import MilvusClient, AnnSearchRequest, RRFRanker
-from sentence_transformers import SentenceTransformer
+
+
+def _quote_expr_value(value: str) -> str:
+    escaped = str(value).replace("\\", "\\\\").replace('"', '\\"')
+    return f'"{escaped}"'
+
+
+def build_filter_expr(
+    category: Optional[str] = None,
+    subcategory: Optional[str] = None,
+    candidate_ticket_ids: Optional[List[str]] = None,
+) -> Optional[str]:
+    expr_parts: List[str] = []
+    if category:
+        expr_parts.append(f"category == {_quote_expr_value(category)}")
+    if subcategory:
+        expr_parts.append(f"subcategory == {_quote_expr_value(subcategory)}")
+    if candidate_ticket_ids:
+        ids = [tid.replace("ticket:", "") for tid in candidate_ticket_ids]
+        quoted = ",".join(_quote_expr_value(x) for x in ids)
+        expr_parts.append(f"ticket_id in [{quoted}]")
+    return " and ".join(expr_parts) if expr_parts else None
 
 
 def connect_milvus(
@@ -30,22 +51,20 @@ def milvus_hybrid_retrieve(
     category: Optional[str] = None,
     subcategory: Optional[str] = None,
     top_k: int = 20,
-    dense_search_params: Optional[Dict[str, Any]] = None,  # allow override
+    dense_search_params: Optional[Dict[str, Any]] = None,
+    embedder: Optional[Any] = None,
 ):
-    # -------- filter expression ----------
-    expr_parts = []
-    if category:
-        expr_parts.append(f'category == "{category}"')
-    if subcategory:
-        expr_parts.append(f'subcategory == "{subcategory}"')
-    if candidate_ticket_ids:
-        ids = [tid.replace("ticket:", "") for tid in candidate_ticket_ids]
-        quoted = ",".join([f'"{x}"' for x in ids])
-        expr_parts.append(f"ticket_id in [{quoted}]")
-    expr = " and ".join(expr_parts) if expr_parts else None
+    expr = build_filter_expr(
+        category=category,
+        subcategory=subcategory,
+        candidate_ticket_ids=candidate_ticket_ids,
+    )
 
     # -------- dense embedding ----------
-    embedder = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2",device='cpu')
+    if embedder is None:
+        from sentence_transformers import SentenceTransformer
+
+        embedder = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2", device="cpu")
     dense_q = embedder.encode(
         [query_text],
         convert_to_numpy=True,
@@ -114,4 +133,4 @@ if __name__ == "__main__":
         top_k=10,
     )
     for r in results[:5]:
-        print(r['entity']["ticket_id"], r["score"], r['entity'].get("category"), r['entity'].get("resolution_code"))
+        print(r.get("ticket_id"), r["score"], r.get("category"), r.get("resolution_code"))

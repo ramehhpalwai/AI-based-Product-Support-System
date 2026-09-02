@@ -204,27 +204,5 @@ class MilvusTicketStore:
         return self.client.list_collections()
 
 
-# -----------------------------
-# Local run (optional)
-# -----------------------------
 if __name__ == "__main__":
-    from src.data.ingestion import load_tickets
-
-    json_data = load_tickets(
-        "/home/ramesh/Personal_projects/AI-based-Product-Support-System/data/raw/support_tickets.json"
-    )
-    tickets = json_data[0]  # your current structure
-
-    store = MilvusTicketStore(
-        uri="http://127.0.0.1:19530",
-        collection_name="support_tickets",
-        dense_dim=384,
-    )
-
-    store.connect()
-    print("connected", store.list_collections())
-
-    store.create_collection(drop_if_exists=True)  # dev
-    store.insert_tickets(tickets[:10000])
-
-    print("inserted  tickets")
+    print("Use: python scripts/build_milvus.py")

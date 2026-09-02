@@ -41,7 +41,4 @@ def load_tickets(path: Union[str, Path]) -> Tuple[List[Ticket], List[dict]]:
 
 
 if __name__ == "__main__":
-    valid, invalid = load_tickets("data/raw/support_tickets.json")
-    print("valid:", len(valid), "invalid:", len(invalid))
-    if invalid:
-        print("example invalid keys:", list(invalid[0].keys())[:10])
+    print("Use: python scripts/ingest.py")

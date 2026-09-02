@@ -145,39 +145,39 @@ def train_and_save_category_model(json_data,text_mode="tfidf", save_path="xgb_ti
             "text_col": features.text_col,
             "text_mode": builder.text_mode,
             "label_mode": builder.label_mode,
-            # optional: store tfidf params used
             "tfidf_params": {
                 "max_features": builder.tfidf_max_features,
                 "ngram_range": builder.tfidf_ngram_range,
                 "min_df": builder.tfidf_min_df,
             },
         }
-    if text_mode == "transformer":
+    elif text_mode == "transformer":
         bundle = {
             "model": model,
             "label_encoder": features.label_encoder,
             "ohe": features.ohe,
-
-            # DO NOT save SentenceTransformer
             "embedder": None,
-
-            # Save how to recreate it
             "text_mode": "transformer",
             "model_name": builder.model_name,
             "device": builder.device,
             "batch_size": builder.batch_size,
             "normalize_embeddings": builder.normalize_embeddings,
-
             "cat_cols": features.cat_cols,
             "text_col": features.text_col,
             "label_mode": builder.label_mode,
         }
-        joblib.dump(bundle, save_path)
-        print(f"Saved to: {save_path}")
+    else:
+        raise ValueError(f"Unknown text_mode: {text_mode!r}")
+
+    joblib.dump(bundle, save_path)
+    print(f"Saved to: {save_path}")
 
     return bundle
 
 
-
-json_data = load_tickets("data/raw/support_tickets.json")
-train_and_save_category_model(json_data[0][:5000],save_path="trained_models/xgb_ticket_model_category.joblib")
+if __name__ == "__main__":
+    json_data = load_tickets("data/raw/support_tickets.json")
+    train_and_save_category_model(
+        json_data[0][:5000],
+        save_path="trained_models/xgb_ticket_model_category.joblib",
+    )

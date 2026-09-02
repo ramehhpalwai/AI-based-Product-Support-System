@@ -1,0 +1,16 @@
+.venv
+.git
+.gitignore
+.pytest_cache
+.ruff_cache
+.cursor
+__pycache__
+*.egg-info
+notebooks
+milvus_data
+minio_data
+etcd_data
+data/raw
+tests
+scripts
+*.ipynb

@@ -90,6 +90,8 @@ class GraphMilvusReranker:
 
             helpful = 1.0 if bool(fields.get("resolution_helpful", False)) else 0.0
 
+            # When Milvus already filtered by category this term is constant across hits;
+            # it still discriminates if the filter is omitted or subcategory differs.
             same_cat = 0.0
             if pred_category and fields.get("category") == pred_category:
                 same_cat += 0.5

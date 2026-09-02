@@ -168,18 +168,6 @@ def load_graph(path: str) -> nx.Graph:
     with open(path, "rb") as f:
         return pickle.load(f)
 
-if __name__ =="__main__":
-    from src.data.ingestion import load_tickets
-    json_data = load_tickets("data/raw/support_tickets.json")
-    Data_tickets = json_data[0]
-    path = "data/artifacts/support_graph.pkl"
-    build_and_save_graph(Data_tickets,path)
-
-# # ---- Example usage ----
-# support_graph = build_support_graph(tickets)
-
-# print("nodes:", support_graph.number_of_nodes())
-# print("edges:", support_graph.number_of_edges())
-
-# print(top_solutions_for_issue(support_graph, "Account Management", "Upgrade", top_k=5))
+if __name__ == "__main__":
+    print("Use: python scripts/build_graph.py")
 
