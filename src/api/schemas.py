@@ -28,6 +28,9 @@ class ClassifyResponse(BaseModel):
 
 class SolutionHit(BaseModel):
     ticket_id: Optional[str] = None
+    subject: Optional[str] = None
+    description: Optional[str] = None
+    error_logs: Optional[str] = None
     final_score: float
     resolution_code: Optional[str] = None
     category: Optional[str] = None

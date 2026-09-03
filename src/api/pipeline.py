@@ -7,6 +7,7 @@ from src.api.schemas import GraphInfo, IncomingTicket, ProcessResponse, Solution
 from src.api.state import AppState
 from src.data.graph_rag_query import GraphQuery, graph_rag_candidates
 from src.rag.milvus_retrieve import milvus_hybrid_retrieve
+from src.rag.milvus_store import split_doc_text
 
 logger = logging.getLogger(__name__)
 
@@ -23,11 +24,18 @@ def classify(state: AppState, ticket: IncomingTicket) -> str:
 
 
 def _wrap_milvus_hits(rows: List[dict]) -> List[dict]:
-    """Adapt flat retriever dicts to the nested {score, entity} shape the reranker expects."""
+    """Adapt retriever dicts to the nested {score, entity} shape the reranker expects."""
     wrapped = []
     for row in rows:
-        score = row.get("score", 0.0)
-        wrapped.append({"score": score, "entity": row})
+        score = row.get("score", row.get("distance", 0.0))
+        nested = row.get("entity")
+        if isinstance(nested, dict) and any(
+            k in nested for k in ("ticket_id", "doc_text", "category", "resolution_code")
+        ):
+            fields = dict(nested)
+        else:
+            fields = {k: v for k, v in row.items() if k not in ("id", "distance", "score", "entity")}
+        wrapped.append({"score": score, "entity": fields})
     return wrapped
 
 
@@ -35,9 +43,13 @@ def _hits_to_solutions(reranked: List[dict]) -> List[SolutionHit]:
     out: List[SolutionHit] = []
     for hit in reranked:
         fields = hit.get("fields") or {}
+        subject, description, error_logs = split_doc_text(fields.get("doc_text") or "")
         out.append(
             SolutionHit(
                 ticket_id=hit.get("ticket_id") or fields.get("ticket_id"),
+                subject=subject or None,
+                description=description or None,
+                error_logs=error_logs or None,
                 final_score=float(hit.get("final_score") or 0.0),
                 resolution_code=fields.get("resolution_code"),
                 category=fields.get("category"),

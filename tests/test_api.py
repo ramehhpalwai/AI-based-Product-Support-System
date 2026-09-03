@@ -155,6 +155,37 @@ def test_wrap_and_rerank_preserves_ticket_fields() -> None:
     assert solutions[0].category == "Technical Issue"
 
 
+def test_wrap_nested_pymilvus_hit() -> None:
+    nested_rows = [
+        {
+            "id": "TK-1",
+            "distance": 0.2,
+            "score": 0.2,
+            "entity": {
+                "ticket_id": "TK-1",
+                "category": "Feature Request",
+                "product": "CloudBackup Enterprise",
+                "resolution_code": "FEATURE_ADDED",
+                "resolution_helpful": True,
+                "doc_text": "Add bulk ops\nWe need bulk operations for CloudBackup.\nERROR_SERVER_500: timeout",
+            },
+        }
+    ]
+    reranked = GraphMilvusReranker().rerank(
+        _wrap_milvus_hits(nested_rows),
+        graph_solution_priors={"solution:FEATURE_ADDED": 1.0},
+        pred_category="Feature Request",
+        top_n=1,
+    )
+    solutions = _hits_to_solutions(reranked)
+    assert solutions[0].ticket_id == "TK-1"
+    assert solutions[0].resolution_code == "FEATURE_ADDED"
+    assert solutions[0].product == "CloudBackup Enterprise"
+    assert solutions[0].subject == "Add bulk ops"
+    assert solutions[0].description == "We need bulk operations for CloudBackup."
+    assert solutions[0].error_logs == "ERROR_SERVER_500: timeout"
+
+
 def test_build_filter_expr_escapes_quotes() -> None:
     expr = build_filter_expr(category='Technical" Issue', subcategory='Upgrade" or x=="y')
     assert expr == 'category == "Technical\\" Issue" and subcategory == "Upgrade\\" or x==\\"y"'

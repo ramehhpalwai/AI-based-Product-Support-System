@@ -112,15 +112,34 @@ def milvus_hybrid_retrieve(
     )
 
     # -------- normalize result ----------
-    # res is typically: List[List[Hit]] (one list per query vector; you have 1 query)
     hits = res[0] if res else []
-    out = []
-    for h in hits:
-        row = dict(h.entity) if hasattr(h, "entity") else {}
-        row["score"] = float(getattr(h, "score", 0.0))
-        out.append(row)
+    return [_hit_to_row(h) for h in hits]
 
-    return out
+
+def _hit_to_row(h: Any) -> dict:
+    """Return a flat field dict plus score, regardless of pymilvus hit shape."""
+    payload = h
+    if not isinstance(h, dict):
+        if hasattr(h, "to_dict"):
+            payload = h.to_dict()
+        else:
+            payload = {
+                "score": getattr(h, "score", getattr(h, "distance", 0.0)),
+                "entity": getattr(h, "entity", None),
+                "id": getattr(h, "id", None),
+                "distance": getattr(h, "distance", None),
+            }
+
+    score = payload.get("score", payload.get("distance", 0.0))
+    inner = payload.get("entity")
+    if isinstance(inner, dict) and any(k in inner for k in ("ticket_id", "doc_text", "category", "resolution_code")):
+        row = dict(inner)
+    else:
+        row = {k: v for k, v in payload.items() if k not in ("id", "distance", "score", "entity")}
+        if not row and isinstance(inner, dict):
+            row = dict(inner)
+    row["score"] = float(score or 0.0)
+    return row
 
 
 # ---------------- example usage ----------------

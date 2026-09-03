@@ -71,6 +71,7 @@ services:
       GRAPH_PATH: data/artifacts/support_graph.pkl
       FEEDBACK_PATH: data/artifacts/feedback.jsonl
     volumes:
+      - ./src:/app/src
       - ./trained_models:/app/trained_models
       - ./data/artifacts:/app/data/artifacts
     depends_on:

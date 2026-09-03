@@ -2,6 +2,8 @@
 
 End-to-end ticket classification and solution retrieval: XGBoost category model, NetworkX Graph-RAG, and Milvus hybrid (dense + BM25) search, exposed as a FastAPI service.
 
+Architecture (diagrams, data flows, technology choices): [ARCHITECTURE.md](ARCHITECTURE.md).
+
 ## Setup
 
 ```bash
@@ -29,7 +31,7 @@ uv run uvicorn src.api.main:app --reload --port 8000
 Or run the API next to Milvus (graph pickle is mounted from `data/artifacts/`, not baked into the image):
 
 ```bash
-docker compose up -d --build api
+docker compose up -d --build
 ```
 
 Docs: http://127.0.0.1:8000/docs
@@ -73,6 +75,9 @@ Example response:
   "solutions": [
     {
       "ticket_id": "TK-2024-001234",
+      "subject": "Database sync failing with timeout error",
+      "description": "Getting ERROR_TIMEOUT_429 when syncing large datasets.",
+      "error_logs": "ERROR_TIMEOUT_429: Connection timeout after 30s",
       "final_score": 0.82,
       "resolution_code": "CONFIG_CHANGE",
       "category": "Technical Issue",

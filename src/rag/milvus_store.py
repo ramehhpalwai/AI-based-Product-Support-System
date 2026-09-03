@@ -35,6 +35,17 @@ def make_doc_text(ticket_row: Dict[str, Any]) -> str:
     ).strip()
 
 
+def split_doc_text(doc_text: str) -> tuple[str, str, str]:
+    """Inverse of make_doc_text: subject, description, error_logs."""
+    if not doc_text:
+        return "", "", ""
+    parts = str(doc_text).split("\n", 2)
+    subject = parts[0] if parts else ""
+    description = parts[1] if len(parts) > 1 else ""
+    error_logs = parts[2] if len(parts) > 2 else ""
+    return subject, description, error_logs
+
+
 def ensure_ticket_id(row: Dict[str, Any]) -> str:
     tid = (row.get("ticket_id") or "").strip()
     if tid:
