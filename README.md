@@ -4,6 +4,23 @@ End-to-end ticket classification and solution retrieval: XGBoost category model,
 
 Architecture (diagrams, data flows, technology choices): [ARCHITECTURE.md](ARCHITECTURE.md).
 
+## Overview
+
+Support teams face 100k+ historical tickets and hundreds of new ones daily. This project builds an intelligent support system that learns from past resolutions to triage incoming tickets and surface the solutions that actually worked. Given a raw ticket (subject, description, error logs, product metadata), the system:
+
+1. **Understands** it — predicts the ticket `category` with a TF-IDF + XGBoost classifier (foundation layer).
+2. **Retrieves** relevant past resolutions — the predicted category filters a Milvus hybrid search (MiniLM dense embeddings + BM25 keyword), so retrieval builds directly on classification.
+3. **Reranks** with graph priors — a NetworkX Graph-RAG maps Products ↔ Issues ↔ Solutions ↔ Tickets (and error codes); results are re-scored by how often each resolution actually helped for that issue type.
+4. **Learns** from feedback — agent corrections and satisfaction are captured to append-only JSONL for later training (feedback is not applied in the request path).
+
+Components deliberately build on each other: classification output drives retrieval, and the graph refines ranking. When Milvus is unavailable the API degrades gracefully to graph-only candidates rather than failing.
+
+### Scope
+
+**Built:** JSON ingestion + validation, category model, Graph-RAG, Milvus hybrid retrieval + reranking, FastAPI service, feedback capture, Docker Compose, tests.
+
+**Left as follow-on** (called out in the brief): TensorFlow/CatBoost comparison, subcategory model, anomaly/drift detection, and experiment tracking (MLflow) with automatic retraining. See [ARCHITECTURE.md](ARCHITECTURE.md) §10.
+
 ## Setup
 
 ```bash

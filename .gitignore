@@ -217,3 +217,7 @@ etcd_data
 
 # Windows Zone.Identifier metadata
 *Zone.Identifier
+
+# Local trained model binaries (rebuild with the training scripts)
+*.joblib
+trained_models/

@@ -138,25 +138,32 @@ Measured duplication: 110,000 rows, all unique `ticket_id`, but only ~1,950 uniq
 
 Undirected NetworkX graph built in `src/data/graph_rag_ingest.py`.
 
+Edge labels below are the exact `rel` values written by `build_support_graph`.
+
 ```mermaid
 flowchart LR
-  Product[product:CloudBackup] -->|product_has_issue| Issue[issue:FeatureRequest_Documentation]
-  Issue -->|about_issue| TicketN[ticket:TK-2024-000001]
-  Issue -->|issue_has_solution| Sol[solution:FEATURE_ADDED]
-  TicketN -->|resolved_by| Sol
+  TicketN[ticket:TK-2024-000001] -->|for_product| Product[product:CloudBackup]
+  TicketN -->|in_module| Module[module:encryption_layer]
+  TicketN -->|about_issue| Issue[issue:FeatureRequest_Documentation]
+  TicketN -->|resolved_by| Sol[solution:FEATURE_ADDED]
   TicketN -->|mentions_error| Err[error:ERROR_SERVER_500]
-  TicketN -->|for_product| Product
+  Product -->|product_sees_issue| Issue
+  Issue -->|issue_has_solution| Sol
+  Issue -->|issue_mentions_error| Err
 ```
 
 | Node | ID pattern | Role at query time |
 |------|------------|--------------------|
 | Product | `product:{name}` | optional context |
+| Module | `module:{product_module}` | optional context |
 | Issue | `issue:{category}\|{subcategory}` | entry for solution priors and citations |
-| Solution | `solution:{resolution_code}` | prior = `0.7 * helpful_rate + 0.3 * log1p(count)/5` |
+| Solution | `solution:{resolution_code}` (falls back to `resolution_template_used`, else content hash) | prior = `0.7 * helpful_rate + 0.3 * log1p(count)/5` |
 | Ticket | `ticket:{ticket_id}` | citation list (capped) |
 | Error | `error:{ERROR_*}` | precision boost via error→ticket→solution |
 
-Without a subcategory hint, issue-level priors are skipped; error-code paths and Milvus category filter still run.
+Aggregated edges (`issue_has_solution`, `product_sees_issue`, `issue_mentions_error`) accumulate `count` and `helpful_count`, which is what the issue-solution prior reads. Per-ticket edges (`about_issue`, `resolved_by`, `mentions_error`, `for_product`, `in_module`) carry the individual links.
+
+Without a subcategory hint the issue node is not formed, so issue-level priors are skipped; error-code paths and the Milvus category filter still run.
 
 ## 5. Hybrid retrieval (Milvus)
 
